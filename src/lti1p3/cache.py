@@ -14,7 +14,7 @@ import secrets
 import time
 from datetime import timedelta
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, cast
 
 type CacheTtl = int | timedelta | None
 
@@ -142,14 +142,19 @@ class FileCache:
             return None
 
         try:
-            record = json.loads(contents)
+            decoded: object = json.loads(contents)
         except ValueError:
             return None
 
-        if not isinstance(record, dict) or "value" not in record or "expiresAt" not in record:
+        if not isinstance(decoded, dict):
             return None
 
-        return record
+        # json.loads gives an untyped dict; the cast states the shape the checks below rely on.
+        record = cast(dict[object, object], decoded)
+        if "value" not in record or "expiresAt" not in record:
+            return None
+
+        return {"value": record["value"], "expiresAt": record["expiresAt"]}
 
     def _hasExpired(self, record: dict[str, object]) -> bool:
         expiresAt = record["expiresAt"]
