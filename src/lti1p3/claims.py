@@ -7,7 +7,7 @@ live in one place rather than being scattered through business logic.
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import Any, ClassVar, cast
 
 from lti1p3.exceptions import InvalidLaunchException, InvalidLaunchReason
 
@@ -44,24 +44,38 @@ def optionalBool(data: Claims, key: str) -> bool | None:
 
 def optionalStringList(data: Claims, key: str) -> list[str]:
     """Return the string entries of a list claim; an empty list when missing or not a list."""
-    value = data.get(key)
-    if not isinstance(value, list):
+    entries = jsonList(data.get(key))
+    if entries is None:
         return []
-    return [entry for entry in value if isinstance(entry, str)]  # pyright: ignore[reportUnknownVariableType]
+    return [entry for entry in entries if isinstance(entry, str)]
 
 
 def optionalArray(data: Claims, key: str) -> Claims | None:
     """Return the mapping claim, or None when it is missing or not a mapping."""
-    value = data.get(key)
-    return asClaims(value)
+    return asClaims(data.get(key))
 
 
 def asClaims(value: object) -> Claims | None:
     """Narrow an arbitrary decoded JSON value to a claims mapping, or None."""
     if not isinstance(value, Mapping):
         return None
-    # A decoded JSON object always has string keys; the checker cannot know that.
-    return value  # pyright: ignore[reportUnknownVariableType, reportReturnType]
+    # A decoded JSON object always has string keys; the checker only knows it is a Mapping.
+    return cast(Claims, value)
+
+
+def jsonObject(value: object) -> dict[str, Any] | None:
+    """Narrow a decoded JSON value to an object (a dict with string keys), or None."""
+    if not isinstance(value, dict):
+        return None
+    # json.loads produces dicts keyed by str; the checker only knows it is a dict.
+    return cast(dict[str, Any], value)
+
+
+def jsonList(value: object) -> list[Any] | None:
+    """Narrow a decoded JSON value to a list, or None."""
+    if not isinstance(value, list):
+        return None
+    return cast(list[Any], value)
 
 
 @dataclass(frozen=True)
@@ -273,9 +287,10 @@ class Roles:
     @classmethod
     def fromClaimValue(cls, value: object) -> "Roles":
         """Build from the raw claim; a missing or malformed claim yields no roles."""
-        if not isinstance(value, list):
+        entries = jsonList(value)
+        if entries is None:
             return cls(())
-        return cls(tuple(entry for entry in value if isinstance(entry, str)))  # pyright: ignore[reportUnknownVariableType]
+        return cls(tuple(entry for entry in entries if isinstance(entry, str)))
 
     def all(self) -> list[str]:
         """Every role URI exactly as received."""
