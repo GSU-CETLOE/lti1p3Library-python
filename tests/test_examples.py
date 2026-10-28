@@ -16,6 +16,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from pathlib import Path
+from typing import IO
 
 import httpx
 import pytest
@@ -77,6 +78,23 @@ def waitUntilServing(baseUrl: str, process: subprocess.Popen[str], logDir: Path)
     raise RuntimeError(f"{baseUrl} did not start in time")
 
 
+def startExampleProcess(script: str, home: Path, log: IO[str]) -> subprocess.Popen[str]:
+    """Start one example server with its output going to a log file."""
+    return subprocess.Popen(
+        [sys.executable, str(EXAMPLES_DIR / script), "--home", str(home)],
+        stdout=log,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+
+
+def stopProcesses(processes: list[subprocess.Popen[str]]) -> None:
+    for process in processes:
+        process.terminate()
+    for process in processes:
+        process.wait(timeout=10)
+
+
 @pytest.fixture(scope="module")
 def servers(tmp_path_factory: pytest.TempPathFactory) -> Iterator[ExampleServers]:
     home = tmp_path_factory.mktemp("example-home")
@@ -104,16 +122,11 @@ def servers(tmp_path_factory: pytest.TempPathFactory) -> Iterator[ExampleServers
     assert (home / "keys" / "tool-key-1.private.pem").is_file()
 
     processes: list[subprocess.Popen[str]] = []
+    logs: list[IO[str]] = []
     for script in ("tool.py", "simulator.py"):
         log = (logDir / f"{script}.log").open("w")
-        processes.append(
-            subprocess.Popen(
-                [sys.executable, str(EXAMPLES_DIR / script), "--home", str(home)],
-                stdout=log,
-                stderr=subprocess.STDOUT,
-                text=True,
-            )
-        )
+        logs.append(log)
+        processes.append(startExampleProcess(script, home, log))
 
     running = ExampleServers(f"http://localhost:{toolPort}", f"http://localhost:{simulatorPort}", processes, logDir)
     try:
@@ -121,10 +134,9 @@ def servers(tmp_path_factory: pytest.TempPathFactory) -> Iterator[ExampleServers
         waitUntilServing(running.simulatorBaseUrl, processes[1], logDir)
         yield running
     finally:
-        for process in processes:
-            process.terminate()
-        for process in processes:
-            process.wait(timeout=10)
+        stopProcesses(processes)
+        for log in logs:
+            log.close()
 
 
 @pytest.fixture
@@ -147,7 +159,7 @@ def launchFromSimulator(browser: httpx.Client, servers: ExampleServers, buttonTe
     assert authenticate.status_code == 200, authenticate.text
 
     form = parseForm(authenticate.text)
-    assert form.action == servers.toolBaseUrl + "/launch"
+    assert form.action is not None and form.action == servers.toolBaseUrl + "/launch"
     assert set(form.fields) == {"state", "id_token"}
     return browser.post(form.action, data=form.fields)
 
@@ -201,7 +213,7 @@ class TestDeepLinking:
         submitted = browser.post(servers.toolBaseUrl + "/deep-link-submit", data={"title": "Chapter 3 quiz"})
         assert submitted.status_code == 200, submitted.text + servers.logs()
         form = parseForm(submitted.text)
-        assert form.action == servers.simulatorBaseUrl + "/deep-link-return"
+        assert form.action is not None and form.action == servers.simulatorBaseUrl + "/deep-link-return"
         assert set(form.fields) == {"JWT"}
 
         verified = browser.post(form.action, data=form.fields)
@@ -220,13 +232,12 @@ class TestWithoutALaunch:
             capture_output=True,
             timeout=60,
         )
-        log = (tmp_path / "tool.log").open("w")
-        process = subprocess.Popen([sys.executable, str(EXAMPLES_DIR / "tool.py"), "--home", str(tmp_path)], stdout=log, stderr=subprocess.STDOUT, text=True)
-        try:
-            waitUntilServing(f"http://localhost:{toolPort}", process, tmp_path)
-            response = httpx.get(f"http://localhost:{toolPort}/ags-score", timeout=10)
-            assert response.status_code == 400
-            assert "No launch on record" in response.text
-        finally:
-            process.terminate()
-            process.wait(timeout=10)
+        with (tmp_path / "tool.log").open("w") as log:
+            process = startExampleProcess("tool.py", tmp_path, log)
+            try:
+                waitUntilServing(f"http://localhost:{toolPort}", process, tmp_path)
+                response = httpx.get(f"http://localhost:{toolPort}/ags-score", timeout=10)
+                assert response.status_code == 400
+                assert "No launch on record" in response.text
+            finally:
+                stopProcesses([process])
