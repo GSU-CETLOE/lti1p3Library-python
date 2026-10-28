@@ -4,7 +4,7 @@ A Python library for the tool side of LTI 1.3 Advantage. It handles the OIDC log
 
 It is a port of the PHP library in the sibling `lti1p3Library-php` repository and keeps the same shape: the same classes, the same validation rules, and the same test coverage. It was built against D2L Brightspace, but it follows the 1EdTech specs, so it should work with any LMS that follows them too.
 
-Every feature is covered by an automated test suite. The tests use real cryptography and a real local HTTP server, with no mocks. The library has not been run against a live Brightspace tenant yet. [TESTPLAN.md](TESTPLAN.md) lists what has been verified and what is still waiting on a sandbox.
+Every feature is covered by an automated test suite. The tests use real cryptography and a real local HTTP server, with no mocks. [TESTPLAN.md](TESTPLAN.md) lists what has been verified and what is still waiting on a sandbox.
 
 ## Requirements
 
@@ -44,10 +44,10 @@ Both must come back clean. The test suite treats warnings as failures.
 
 The library has no hard dependency on a web framework, a database, or a cache server. You hand it these pieces:
 
-| You provide | The library uses it for |
-|---|---|
-| An `httpx.Client` | Calls to the platform: JWKS fetches, token requests, AGS, and NRPS |
-| A class that implements `RegistrationRepositoryInterface` | Looking up platform registrations in your own database |
+| You provide                                                          | The library uses it for                                                          |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| An `httpx.Client`                                                    | Calls to the platform: JWKS fetches, token requests, AGS, and NRPS               |
+| A class that implements `RegistrationRepositoryInterface`            | Looking up platform registrations in your own database                           |
 | A cache that implements `CacheInterface` (optional, one is included) | Short-lived data such as login state and access tokens. See [Caching](#caching). |
 
 Requests and responses are plain values. A handler takes a mapping of the request's parameters and returns an `HttpResponse` with a status code, headers, and a text body. Your framework turns those into its own request and response objects. The [examples](examples/) do this with the standard library's HTTP server.
@@ -200,12 +200,12 @@ return renderFormPost(
 
 The library caches four things. You don't have to manage any of them yourself.
 
-| What | Kept for | Why |
-|---|---|---|
-| The platform's JWKS (public keys) | 1 hour | So a launch doesn't fetch the keys every time |
-| Login state | 5 minutes, and deleted as soon as the launch uses it | Ties a launch to the login request that started it |
-| Nonces | 1 hour | Rejects an id_token that is sent a second time |
-| Service access tokens | The token's lifetime minus 60 seconds | So AGS and NRPS calls don't request a new token each time |
+| What                              | Kept for                                             | Why                                                       |
+| --------------------------------- | ---------------------------------------------------- | --------------------------------------------------------- |
+| The platform's JWKS (public keys) | 1 hour                                               | So a launch doesn't fetch the keys every time             |
+| Login state                       | 5 minutes, and deleted as soon as the launch uses it | Ties a launch to the login request that started it        |
+| Nonces                            | 1 hour                                               | Rejects an id_token that is sent a second time            |
+| Service access tokens             | The token's lifetime minus 60 seconds                | So AGS and NRPS calls don't request a new token each time |
 
 To change a duration, pass it to the constructor: `cacheTtlSeconds` on `JwksFetcher`, `stateTtlSeconds` on `LoginInitiationHandler`, or `nonceTtlSeconds` on `JwtValidator`. For example:
 
@@ -316,24 +316,24 @@ A Brightspace admin or developer registers the tool once per environment, in two
 
 Step 1 is the tool registration. You provide:
 
-| Field | Value |
-|---|---|
-| `OpenIDConnectLoginUrl` | Your tool's login endpoint (step 5 above) |
-| `KeysetUrl` | Your tool's JWKS URL (step 4 above) |
-| `RedirectUrls` | Array of authorized launch and redirect URIs (step 6 above) |
+| Field                   | Value                                                       |
+| ----------------------- | ----------------------------------------------------------- |
+| `OpenIDConnectLoginUrl` | Your tool's login endpoint (step 5 above)                   |
+| `KeysetUrl`             | Your tool's JWKS URL (step 4 above)                         |
+| `RedirectUrls`          | Array of authorized launch and redirect URIs (step 6 above) |
 
 Step 2 is the deployment. It is linked to the registration by `ClientId`, and it sets which user fields Brightspace sends (`SendUserFirstName`, `SendUserEmail`, `SendD2LUserId`, and so on).
 
 Brightspace then returns the values you need to build your `Registration` object:
 
-| Brightspace field | `Registration` constructor argument |
-|---|---|
-| `BrightspaceIssuer` | `issuer` |
-| The `ClientId` from your deployment | `clientId` |
-| `BrightspaceOIDCAuthenticationEndpoint` | `platformAuthenticationLoginUrl` |
-| `BrightspaceOAuth2AccessTokenUrl` | `platformAuthenticationTokenUrl` |
-| `BrightspaceKeysetUrl` | `platformJwksUrl` |
-| `BrightspaceOAuth2Audience` | `platformAudience` (required for Brightspace, because it is not the token URL) |
+| Brightspace field                       | `Registration` constructor argument                                            |
+| --------------------------------------- | ------------------------------------------------------------------------------ |
+| `BrightspaceIssuer`                     | `issuer`                                                                       |
+| The `ClientId` from your deployment     | `clientId`                                                                     |
+| `BrightspaceOIDCAuthenticationEndpoint` | `platformAuthenticationLoginUrl`                                               |
+| `BrightspaceOAuth2AccessTokenUrl`       | `platformAuthenticationTokenUrl`                                               |
+| `BrightspaceKeysetUrl`                  | `platformJwksUrl`                                                              |
+| `BrightspaceOAuth2Audience`             | `platformAudience` (required for Brightspace, because it is not the token URL) |
 
 Brightspace's JWKS endpoint usually looks like `https://<your-subdomain>.brightspace.com/d2l/.well-known/jwks`.
 
@@ -345,16 +345,16 @@ The OIDC login URL and the redirect URIs must use HTTPS. Brightspace rejects `ht
 
 The public API keeps the PHP names, so the PHP README's steps map one to one. The differences are where PHP standards had no Python equivalent:
 
-| PHP | Python |
-|---|---|
-| PSR-18 client plus PSR-17 factories | An `httpx.Client` |
-| PSR-16 `CacheInterface` | A five-method `CacheInterface` Protocol; `FileCache` stores JSON, not serialized PHP |
-| PSR-7 `ServerRequestInterface` | A mapping of request parameters |
-| PSR-7 `ResponseInterface` | An `HttpResponse` value (status code, headers, body) |
-| `firebase/php-jwt` | PyJWT with `cryptography` |
-| `JwksBuilder`, `KeyPairGenerator`, `FormPostRenderer` classes | The functions `buildJwks`, `buildJwk`, `generateKeyPair`, and `renderFormPost` |
-| `toArray()` | `toDict()` |
-| One file per class | One module per area: `cache`, `claims`, `messages`, `deepLinking`, `oidcLogin`, `security`, `ags`, `nrps`, and so on |
+| PHP                                                           | Python                                                                                                               |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| PSR-18 client plus PSR-17 factories                           | An `httpx.Client`                                                                                                    |
+| PSR-16 `CacheInterface`                                       | A five-method `CacheInterface` Protocol; `FileCache` stores JSON, not serialized PHP                                 |
+| PSR-7 `ServerRequestInterface`                                | A mapping of request parameters                                                                                      |
+| PSR-7 `ResponseInterface`                                     | An `HttpResponse` value (status code, headers, body)                                                                 |
+| `firebase/php-jwt`                                            | PyJWT with `cryptography`                                                                                            |
+| `JwksBuilder`, `KeyPairGenerator`, `FormPostRenderer` classes | The functions `buildJwks`, `buildJwk`, `generateKeyPair`, and `renderFormPost`                                       |
+| `toArray()`                                                   | `toDict()`                                                                                                           |
+| One file per class                                            | One module per area: `cache`, `claims`, `messages`, `deepLinking`, `oidcLogin`, `security`, `ags`, `nrps`, and so on |
 
 Everything is importable from the `lti1p3` package directly.
 
