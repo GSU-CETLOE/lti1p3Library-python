@@ -2,8 +2,6 @@
 
 A Python library for the tool side of LTI 1.3 Advantage. It handles the OIDC login and launch, Deep Linking 2.0, the Assignment and Grades Service (AGS) 2.0, and the Names and Role Provisioning Service (NRPS) 2.0. It works with any web framework, or none.
 
-It is a port of the PHP library in the sibling `lti1p3Library-php` repository and keeps the same shape: the same classes, the same validation rules, and the same test coverage. It was built against D2L Brightspace, but it follows the 1EdTech specs, so it should work with any LMS that follows them too.
-
 Every feature is covered by an automated test suite. The tests use real cryptography and a real local HTTP server, with no mocks. [TESTPLAN.md](TESTPLAN.md) lists what has been verified and what is still waiting on a sandbox.
 
 ## Requirements
@@ -343,7 +341,6 @@ The OIDC login URL and the redirect URIs must use HTTPS. Brightspace rejects `ht
 
 ## Known limitations
 
-- No end-to-end testing against a live Brightspace tenant yet. That needs a sandbox; see [TESTPLAN.md](TESTPLAN.md).
 - `AssignmentsGradesService.listLineItems()` fetches a single page and does not follow `Link` header pagination. NRPS roster fetches do paginate.
 - Submission Review and the Platform Notification Service are not implemented in this version.
 
