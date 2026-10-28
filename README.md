@@ -341,23 +341,6 @@ A deployment's `EnabledExtensions` array says which Advantage services are activ
 
 The OIDC login URL and the redirect URIs must use HTTPS. Brightspace rejects `http://` at registration time, and this library applies the same rule when you construct a `Registration`. The one exception is loopback addresses, which the library's own local test fixtures use.
 
-## How this differs from the PHP library
-
-The public API keeps the PHP names, so the PHP README's steps map one to one. The differences are where PHP standards had no Python equivalent:
-
-| PHP                                                           | Python                                                                                                               |
-| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| PSR-18 client plus PSR-17 factories                           | An `httpx.Client`                                                                                                    |
-| PSR-16 `CacheInterface`                                       | A five-method `CacheInterface` Protocol; `FileCache` stores JSON, not serialized PHP                                 |
-| PSR-7 `ServerRequestInterface`                                | A mapping of request parameters                                                                                      |
-| PSR-7 `ResponseInterface`                                     | An `HttpResponse` value (status code, headers, body)                                                                 |
-| `firebase/php-jwt`                                            | PyJWT with `cryptography`                                                                                            |
-| `JwksBuilder`, `KeyPairGenerator`, `FormPostRenderer` classes | The functions `buildJwks`, `buildJwk`, `generateKeyPair`, and `renderFormPost`                                       |
-| `toArray()`                                                   | `toDict()`                                                                                                           |
-| One file per class                                            | One module per area: `cache`, `claims`, `messages`, `deepLinking`, `oidcLogin`, `security`, `ags`, `nrps`, and so on |
-
-Everything is importable from the `lti1p3` package directly.
-
 ## Known limitations
 
 - No end-to-end testing against a live Brightspace tenant yet. That needs a sandbox; see [TESTPLAN.md](TESTPLAN.md).
